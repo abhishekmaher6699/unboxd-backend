@@ -29,7 +29,7 @@ class Ranking:
         for attempt in range(max_attempts):
             try:
                 async with session.get(url) as response:
-                    print(f"Fetching {url} (Attempt {attempt + 1}/{max_attempts})")
+                    # print(f"Fetching {url} (Attempt {attempt + 1}/{max_attempts})")
                     if 'api.themoviedb.org' in url:
                         return await response.json()
                     else:
