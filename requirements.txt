@@ -38,4 +38,5 @@ yarl==1.17.1
 uvicorn
 gunicorn
 python-dotenv
+lxml
 
