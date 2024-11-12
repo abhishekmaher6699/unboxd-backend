@@ -249,7 +249,7 @@ class MovieDataScraper:
    
         static_data = fetch_static_row(name)
         if static_data:
-            # print("fetching data from db")
+            print("fetching data from db")
             tmdb_data = {
                 'title': static_data[1],
                 'tmdb_id': int(static_data[2]),
@@ -277,6 +277,7 @@ class MovieDataScraper:
             dir, actors, themes, tmdb_id = self.extract_metadata(soup)
             tmdb_data = await self.fetch_tmdb_details(tmdb_id, session) if tmdb_id else None
             if tmdb_data:
+                print("inserted")
                 insert_into_static((name, tmdb_data, actors, dir, themes, nanogenres))
             return tmdb_data, actors, dir, themes, nanogenres 
 
@@ -399,7 +400,8 @@ class MovieDataScraper:
                     valid_data = MovieData(**movie_data)
                     all_movie_data.append(valid_data)
                 except Exception as e:
-                   print(f"Error creating MovieData")
+                   # print(f"Error creating MovieData")
+                  pass
             
             # json_file_path = f"{self.user}_movie_data.json"  # Set the filename
             # with open(json_file_path, 'w') as json_file:
