@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
 
-db = "movies.db"
+db = Path(__file__).parent / "movies.db"
 
 def create_static_table() -> None:
     with sqlite3.connect(db) as conn:
