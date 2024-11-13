@@ -17,6 +17,13 @@ from database.database import (create_static_table, insert_into_static,
 
 load_dotenv()
 
+class UserMovieCountError(ValueError):
+    status_code = 400
+
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
 class MovieData(BaseModel):
     title: str = 'Unknown'
     tmdb_id: Optional[int] = None
@@ -249,7 +256,7 @@ class MovieDataScraper:
    
         static_data = fetch_static_row(name)
         if static_data:
-            print("fetching data from db")
+            # print("fetching data from db")
             tmdb_data = {
                 'title': static_data[1],
                 'tmdb_id': int(static_data[2]),
@@ -277,7 +284,6 @@ class MovieDataScraper:
             dir, actors, themes, tmdb_id = self.extract_metadata(soup)
             tmdb_data = await self.fetch_tmdb_details(tmdb_id, session) if tmdb_id else None
             if tmdb_data:
-                print("inserted")
                 insert_into_static((name, tmdb_data, actors, dir, themes, nanogenres))
             return tmdb_data, actors, dir, themes, nanogenres 
 
@@ -395,13 +401,15 @@ class MovieDataScraper:
             results =await asyncio.gather(*tasks)
             flattened_results = [movie_data for sublist in results for movie_data in sublist]
             
+            if len(flattened_results) < 20:
+                raise UserMovieCountError(f"User has not watched enough movies")
+            
             for movie_data in flattened_results:
                 try:
                     valid_data = MovieData(**movie_data)
                     all_movie_data.append(valid_data)
                 except Exception as e:
-                   # print(f"Error creating MovieData")
-                  pass
+                   print(f"Error creating MovieData")
             
             # json_file_path = f"{self.user}_movie_data.json"  # Set the filename
             # with open(json_file_path, 'w') as json_file:

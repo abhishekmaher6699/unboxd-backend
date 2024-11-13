@@ -2,7 +2,7 @@ from typing import List, Any
 from fastapi import FastAPI, HTTPException
 import logging
 import json
-from components.MovieScraper import MovieDataScraper, MovieData
+from components.MovieScraper import MovieDataScraper, MovieData, UserMovieCountError
 from components.ReviewScraper import ReviewScraper, UserReviewCountError
 from components.Ranking import Ranking
 from components.DataProcessor import Processor
@@ -20,7 +20,6 @@ app = FastAPI()
 
 allowed_origins = [
     "http://localhost:5173", 
-    "https://unboxd-frontend.vercel.app"
 ]
 
 app.add_middleware(
@@ -47,6 +46,8 @@ async def movie_info(user:str):
         }
     except KeyError:
         raise HTTPException(status_code=404, detail="Stat_404")
+    except UserMovieCountError:
+        raise HTTPException(status_code=400, detail="Stat_400")
 
 @app.get("/reviews/")
 async def reviews(user:str):
