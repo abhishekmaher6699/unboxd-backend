@@ -20,7 +20,8 @@ app = FastAPI()
 
 allowed_origins = [
     "http://localhost:5173", 
-    "https://unboxd-frontend.vercel.app"
+    "https://unboxd-frontend.vercel.app",
+    "https://unboxdbyabhi.vercel.app"
 ]
 
 app.add_middleware(
