@@ -34,8 +34,9 @@ app.add_middleware(
 
 @app.get("/movies-data/", response_model=MovieResponse)
 async def movie_info(user:str):
+    user = user.strip()
     try:
-        logging.info("Getting Movie Data")
+        logging.info(f"Getting Movie Data for {user}")
         movie_scraper = MovieDataScraper(user)
         movie_data = await movie_scraper.scrape()
 
@@ -53,9 +54,9 @@ async def movie_info(user:str):
 
 @app.get("/reviews/")
 async def reviews(user:str):
-
+    user = user.strip()
     try:
-        logging.info("Getting reviews")
+        logging.info(f"Getting reviews for {user}")
         review_scraper = ReviewScraper(user)
         results = await review_scraper.scrape()
         return results
@@ -64,8 +65,9 @@ async def reviews(user:str):
 
 @app.get("/rank")
 async def friends_ranking(user:str, group:str):
+    user = user.strip()
     try:
-        logging.info("Getting rank data")
+        logging.info(f"Getting rank data for {user}")
         ranker = Ranking(user, group)
         results = await ranker.rank_friends()
         return results

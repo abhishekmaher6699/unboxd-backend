@@ -409,7 +409,8 @@ class MovieDataScraper:
                     valid_data = MovieData(**movie_data)
                     all_movie_data.append(valid_data)
                 except Exception as e:
-                   print(f"Error creating MovieData")
+                #    print(f"Error creating MovieData")
+                    pass
             
             # json_file_path = f"{self.user}_movie_data.json"  # Set the filename
             # with open(json_file_path, 'w') as json_file:
