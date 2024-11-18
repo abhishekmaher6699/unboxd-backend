@@ -64,7 +64,7 @@ class MovieDataScraper:
         for attempt in range(max_attempts):
             try:
                 async with session.get(url) as response:
-                    # print(f"Fetching {url} (Attempt {attempt + 1}/{max_attempts})")
+                    print(f"Fetching {url} (Attempt {attempt + 1}/{max_attempts})")
                     if 'api.themoviedb.org' in url:
                         return await response.json()
                     else:
@@ -284,7 +284,8 @@ class MovieDataScraper:
             dir, actors, themes, tmdb_id = self.extract_metadata(soup)
             tmdb_data = await self.fetch_tmdb_details(tmdb_id, session) if tmdb_id else None
             if tmdb_data:
-                insert_into_static((name, tmdb_data, actors, dir, themes, nanogenres))
+                # insert_into_static((name, tmdb_data, actors, dir, themes, nanogenres))
+                pass
             return tmdb_data, actors, dir, themes, nanogenres 
 
     async def fetch_semistatic_data(self, session: aiohttp.ClientSession, name: str):
@@ -303,7 +304,7 @@ class MovieDataScraper:
             is_stale = (current_time - timestamp).days >= 5
             if is_stale: # if data is older than 2 days, update it
                ratings, stats = await new_data()
-               update_semistatic((name, ratings, stats, current_time.isoformat()))
+            #    update_semistatic((name, ratings, stats, current_time.isoformat()))
                return ratings, stats
             #    print("data updated")
             else: # if data is fresh, fetch it from db
@@ -322,7 +323,7 @@ class MovieDataScraper:
             
         else: # if data doesnt exist, insert it
             ratings, stats = await new_data()
-            insert_into_semistatic((name, ratings, stats, current_time.isoformat()))
+            # insert_into_semistatic((name, ratings, stats, current_time.isoformat()))
             return ratings, stats
             
     async def compile_data(self, session: aiohttp.ClientSession, link: str, review: str, like: bool, user_rating: float) -> Dict[str, Any]:
@@ -366,7 +367,7 @@ class MovieDataScraper:
             'is_reviewed': review,
         }
 
-    async def start_process(self, session: aiohttp.ClientSession, url: str) -> List[Dict[str, Any]]:
+    async def start_process(self, session: aiohttp.ClientSession, url: str, batch_size=24) -> List[Dict[str, Any]]:
         html = await self.fetch(session, url)
         if not html:
             return []  # Return empty list if fetching failed
@@ -375,10 +376,17 @@ class MovieDataScraper:
         
         tasks = [self.compile_data(session, link, review, like, user_rating)
                 for link, review, like, user_rating in zip(movie_links, reviews, likes, user_ratings)]
-        # movie_data = await asyncio.gather(*tasks)
-        movie_data =await asyncio.gather(*tasks)
-        # Filter out None values in case some tasks failed
-        return [data for data in movie_data if data]
+        
+        batched_data = []
+        for i in range(0, len(tasks), batch_size):
+            batch = tasks[i:i + batch_size]
+            # Gather data for the current batch
+            batch_result = await asyncio.gather(*batch, return_exceptions=True)
+            # Filter out None or exceptions
+            batch_result = [data for data in batch_result if data is not None and not isinstance(data, Exception)]
+            batched_data.extend(batch_result)
+        
+        return batched_data
 
     def page_nums(self) -> int:
         url = f"https://letterboxd.com/{self.user}/films"
@@ -390,30 +398,46 @@ class MovieDataScraper:
             num_pages = 1
         return num_pages
     
-    async def scrape(self) -> List[MovieData]:
+    async def scrape(self, batch_size: int = 2) -> List['MovieData']:
         pages = self.page_nums()
         urls = [f"https://letterboxd.com/{self.user}/films/page/{i}/" for i in range(1, pages + 1)]
         all_movie_data = []
 
-        connector = aiohttp.TCPConnector(limit_per_host=5)  
-        async with aiohttp.ClientSession(connector=connector) as session:
-            tasks = [self.start_process(session, url) for url in urls]
-            results =await asyncio.gather(*tasks)
-            flattened_results = [movie_data for sublist in results for movie_data in sublist]
-            
-            if len(flattened_results) < 20:
-                raise UserMovieCountError(f"User has not watched enough movies")
-            
-            for movie_data in flattened_results:
-                try:
-                    valid_data = MovieData(**movie_data)
-                    all_movie_data.append(valid_data)
-                except Exception as e:
-                #    print(f"Error creating MovieData")
-                    pass
-            
-            # json_file_path = f"{self.user}_movie_data.json"  # Set the filename
-            # with open(json_file_path, 'w') as json_file:
-            #     json.dump([movie.dict() for movie in all_movie_data], json_file, indent=4)
+        # Use a context manager and limit concurrent connections
+        async with aiohttp.TCPConnector(limit_per_host=5) as connector:
+            async with aiohttp.ClientSession(connector=connector) as session:
+                # Use generator-based processing to reduce memory usage
+                for i in range(0, len(urls), batch_size):
+                    batch = urls[i:i + batch_size]
                     
-            return all_movie_data
+                    # Process batch with memory-efficient gather
+                    try:
+                        batch_results = await asyncio.gather(
+                            *(self.start_process(session, url) for url in batch),
+                            return_exceptions=True
+                        )
+                        
+                        # Generator for flattening results
+                        def result_generator():
+                            for sublist in batch_results:
+                                if isinstance(sublist, list):
+                                    yield from sublist
+
+                        # Process and validate results incrementally
+                        for movie_data in result_generator():
+                            try:
+                                valid_data = MovieData(**movie_data)
+                                all_movie_data.append(valid_data)
+                                
+                                # Optional: yield results incrementally if needed
+                                # yield valid_data
+                            except Exception:
+                                continue
+
+                        if len(all_movie_data) < 20 and i == 0:
+                            raise UserMovieCountError(f"User has not watched enough movies")
+
+                    except Exception as e:
+                        print(f"Batch processing error: {e}")
+
+        return all_movie_data
