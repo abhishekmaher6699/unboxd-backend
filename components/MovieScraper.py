@@ -60,10 +60,11 @@ class MovieDataScraper:
         max_attempts = 3
         base_wait_time = 1
         max_wait_time = 10
+        timeout = 10
 
         for attempt in range(max_attempts):
             try:
-                async with session.get(url) as response:
+                async with session.get(url,timeout=aiohttp.ClientTimeout(total=timeout)) as response:
                     # print(f"Fetching {url} (Attempt {attempt + 1}/{max_attempts})")
                     if 'api.themoviedb.org' in url:
                         return await response.json()
@@ -284,7 +285,7 @@ class MovieDataScraper:
             dir, actors, themes, tmdb_id = self.extract_metadata(soup)
             tmdb_data = await self.fetch_tmdb_details(tmdb_id, session) if tmdb_id else None
             if tmdb_data:
-                # insert_into_static((name, tmdb_data, actors, dir, themes, nanogenres))
+                insert_into_static((name, tmdb_data, actors, dir, themes, nanogenres))
                 pass
             return tmdb_data, actors, dir, themes, nanogenres 
 
@@ -304,7 +305,7 @@ class MovieDataScraper:
             is_stale = (current_time - timestamp).days >= 5
             if is_stale: # if data is older than 2 days, update it
                ratings, stats = await new_data()
-            #    update_semistatic((name, ratings, stats, current_time.isoformat()))
+               update_semistatic((name, ratings, stats, current_time.isoformat()))
                return ratings, stats
             #    print("data updated")
             else: # if data is fresh, fetch it from db
@@ -323,7 +324,7 @@ class MovieDataScraper:
             
         else: # if data doesnt exist, insert it
             ratings, stats = await new_data()
-            # insert_into_semistatic((name, ratings, stats, current_time.isoformat()))
+            insert_into_semistatic((name, ratings, stats, current_time.isoformat()))
             return ratings, stats
             
     async def compile_data(self, session: aiohttp.ClientSession, link: str, review: str, like: bool, user_rating: float) -> Dict[str, Any]:
@@ -379,11 +380,8 @@ class MovieDataScraper:
         
         batched_data = []
         for i in range(0, len(tasks), batch_size):
-            print(f"in batch {i} of movies")
             batch = tasks[i:i + batch_size]
-            # Gather data for the current batch
             batch_result = await asyncio.gather(*batch, return_exceptions=True)
-            # Filter out None or exceptions
             batch_result = [data for data in batch_result if data is not None and not isinstance(data, Exception)]
             batched_data.extend(batch_result)
         
@@ -404,35 +402,28 @@ class MovieDataScraper:
         urls = [f"https://letterboxd.com/{self.user}/films/page/{i}/" for i in range(1, pages + 1)]
         all_movie_data = []
 
-        # Use a context manager and limit concurrent connections
-        async with aiohttp.TCPConnector(limit_per_host=5) as connector:
+        async with aiohttp.TCPConnector(limit_per_host=3) as connector:
             async with aiohttp.ClientSession(connector=connector) as session:
-                # Use generator-based processing to reduce memory usage
+
                 for i in range(0, len(urls), batch_size):
-                    print(f"in batch {i} of pages")
                     batch = urls[i:i + batch_size]
                     
-                    # Process batch with memory-efficient gather
                     try:
                         batch_results = await asyncio.gather(
                             *(self.start_process(session, url) for url in batch),
                             return_exceptions=True
                         )
                         
-                        # Generator for flattening results
                         def result_generator():
                             for sublist in batch_results:
                                 if isinstance(sublist, list):
                                     yield from sublist
 
-                        # Process and validate results incrementally
                         for movie_data in result_generator():
                             try:
                                 valid_data = MovieData(**movie_data)
                                 all_movie_data.append(valid_data)
                                 
-                                # Optional: yield results incrementally if needed
-                                # yield valid_data
                             except Exception:
                                 continue
 
