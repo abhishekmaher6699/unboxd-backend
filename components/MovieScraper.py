@@ -64,7 +64,7 @@ class MovieDataScraper:
         for attempt in range(max_attempts):
             try:
                 async with session.get(url) as response:
-                    print(f"Fetching {url} (Attempt {attempt + 1}/{max_attempts})")
+                    # print(f"Fetching {url} (Attempt {attempt + 1}/{max_attempts})")
                     if 'api.themoviedb.org' in url:
                         return await response.json()
                     else:
@@ -379,6 +379,7 @@ class MovieDataScraper:
         
         batched_data = []
         for i in range(0, len(tasks), batch_size):
+            print(f"in batch {i} of movies")
             batch = tasks[i:i + batch_size]
             # Gather data for the current batch
             batch_result = await asyncio.gather(*batch, return_exceptions=True)
@@ -408,6 +409,7 @@ class MovieDataScraper:
             async with aiohttp.ClientSession(connector=connector) as session:
                 # Use generator-based processing to reduce memory usage
                 for i in range(0, len(urls), batch_size):
+                    print(f"in batch {i} of pages")
                     batch = urls[i:i + batch_size]
                     
                     # Process batch with memory-efficient gather

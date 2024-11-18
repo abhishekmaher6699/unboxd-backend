@@ -1,40 +1,12 @@
 from typing import List, Any
 from fastapi import FastAPI, HTTPException
 import logging
-import json
-import os
-import psutil
-import gc
-from functools import wraps
-from memory_profiler import profile
-from contextlib import contextmanager
 from components.MovieScraper import MovieDataScraper, MovieData, UserMovieCountError
 from components.ReviewScraper import ReviewScraper, UserReviewCountError
 from components.Ranking import Ranking
 from components.DataProcessor import Processor
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-
-@contextmanager
-def memory_tracker(section_name: str):
-    """Context manager to track memory usage before and after a code block"""
-    process = psutil.Process(os.getpid())
-    start_mem = process.memory_info().rss / 1024 / 1024  # MB
-    logging.info(f"Starting {section_name}: {start_mem:.2f} MB")
-    try:
-        yield
-    finally:
-        gc.collect()  # Force garbage collection
-        end_mem = process.memory_info().rss / 1024 / 1024  # MB
-        logging.info(f"Finished {section_name}: {end_mem:.2f} MB (Difference: {end_mem - start_mem:.2f} MB)")
-
-def memory_logged(func):
-    """Decorator to log memory usage of functions"""
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        with memory_tracker(func.__name__):
-            return await func(*args, **kwargs)
-    return wrapper
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -59,7 +31,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@memory_logged
 @app.get("/movies-data/", response_model=MovieResponse)
 async def movie_info(user:str):
     user = user.strip()
