@@ -215,9 +215,32 @@ class Ranking:
         elif self.subset == "both":
             user_names1, names1, pics1 = await self.extract_friends("followers", follower_pages)
             user_names2, names2, pics2 = await self.extract_friends("following", following_pages)
+            
+            # Create temporary mappings to preserve picture relationships
+            temp_pic_map1 = {username: pic for username, pic in zip(user_names1, pics1)}
+            temp_pic_map2 = {username: pic for username, pic in zip(user_names2, pics2)}
+            
+            # Combine usernames and names while preserving uniqueness
             user_names = list(dict.fromkeys(user_names1 + user_names2))
-            names = list(dict.fromkeys(names1 + names2))
-            pics = list(dict.fromkeys(pics1 + pics2))
+            names = []
+            pics = []
+            
+            # Create final name and pic lists while maintaining correct relationships
+            for username in user_names:
+                # Find the corresponding name from either list
+                name = None
+                if username in user_names1:
+                    idx = user_names1.index(username)
+                    name = names1[idx]
+                elif username in user_names2:
+                    idx = user_names2.index(username)
+                    name = names2[idx]
+                
+                # Find the corresponding picture
+                pic = temp_pic_map1.get(username) or temp_pic_map2.get(username)
+                
+                names.append(name)
+                pics.append(pic)
         
         name_map = {username: name for username, name in zip(user_names, names)}
         reversed_name_map = {name: username for username, name in zip(user_names, names)}
